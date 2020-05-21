@@ -1,18 +1,38 @@
-/*
-  ==============================================================================
-
-    This file was auto-generated!
-
-    It contains the basic framework code for a JUCE plugin processor.
-
-  ==============================================================================
-*/
-
 #include "PluginProcessor.h"
 #include "PluginEditor.h"
 
+String SimpleFilterAudioProcessor::paramCutoffFrequency("cutoff");
+String SimpleFilterAudioProcessor::paramFilterType("filterType");
+String SimpleFilterAudioProcessor::paramQ("q");
+
+AudioProcessorValueTreeState::ParameterLayout SimpleFilterAudioProcessor::createParameterLayout()
+{
+    std::vector<std::unique_ptr<RangedAudioParameter>> params;
+
+    params.push_back(std::make_unique<AudioParameterFloat>(
+        paramCutoffFrequency, 
+        "Cutoff Frequency", 
+        NormalisableRange<float>(20, 20000, 0.1, 0.3, false), 
+        440));
+
+    params.push_back(std::make_unique<AudioParameterChoice>(
+        paramFilterType, 
+        "Filter Type", 
+        StringArray({ "Low Pass", "High Pass" }), 
+        0));
+    
+    params.push_back(std::make_unique<AudioParameterFloat>(
+        paramQ, 
+        "Q", 
+        0.1, 
+        20, 
+        0.703));
+
+    return { params.begin(), params.end() };
+}
+
 SimpleFilterAudioProcessor::SimpleFilterAudioProcessor()
-    : parameters(*this, nullptr)
+    : parameters(*this, nullptr, "SimpleFilter", createParameterLayout())
 #ifndef JucePlugin_PreferredChannelConfigurations
     , AudioProcessor (BusesProperties()
         #if ! JucePlugin_IsMidiEffect
@@ -24,13 +44,16 @@ SimpleFilterAudioProcessor::SimpleFilterAudioProcessor()
     )
 #endif
 {
-    addParameter(m_parameterQ = new AudioParameterFloat("q", "Q", 0.1, 20, 0.2));
-    addParameter(m_parameterCutoffFrequency = new AudioParameterFloat("cutoffFrequency", "Cutoff Frequency", NormalisableRange<float>(20, 20000, 0.1, 0.3, false), 440));
-    addParameter(m_parameterFilterType = new AudioParameterChoice("filterType", "Filter Type", {"Low Pass", "High Pass"}, 0));
+    parameters.addParameterListener(paramCutoffFrequency, this);
+    parameters.addParameterListener(paramFilterType, this);
+    parameters.addParameterListener(paramQ, this);
 }
 
 SimpleFilterAudioProcessor::~SimpleFilterAudioProcessor()
 {
+    parameters.removeParameterListener(paramCutoffFrequency, this);
+    parameters.removeParameterListener(paramFilterType, this);
+    parameters.removeParameterListener(paramQ, this);
 }
 
 const String SimpleFilterAudioProcessor::getName() const
@@ -131,18 +154,6 @@ void SimpleFilterAudioProcessor::processBlock (AudioBuffer<float>& buffer, MidiB
     auto totalNumOutputChannels = getTotalNumOutputChannels();
     auto totalNumSamples = buffer.getNumSamples();
 
-    Biquad::FilterType filterType = m_parameterFilterType->getIndex() == 0 
-        ? Biquad::FilterType::LowPass 
-        : Biquad::FilterType::HighPass;
-
-    m_leftBiquad.setQ(*m_parameterQ);
-    m_leftBiquad.setCutoffFrequency(*m_parameterCutoffFrequency);
-    m_leftBiquad.setFilterType(filterType);
-
-    m_rightBiquad.setQ(*m_parameterQ);
-    m_rightBiquad.setCutoffFrequency(*m_parameterCutoffFrequency);
-    m_rightBiquad.setFilterType(filterType);
-
     for (auto i = totalNumInputChannels; i < totalNumOutputChannels; ++i)
         buffer.clear (i, 0, buffer.getNumSamples());
 
@@ -172,6 +183,28 @@ void SimpleFilterAudioProcessor::getStateInformation (MemoryBlock& destData)
 
 void SimpleFilterAudioProcessor::setStateInformation (const void* data, int sizeInBytes)
 {
+}
+
+void SimpleFilterAudioProcessor::parameterChanged(const String& parameterID, float newValue)
+{
+    if (parameterID == paramCutoffFrequency)
+    {
+        m_leftBiquad.setCutoffFrequency(newValue);
+        m_rightBiquad.setCutoffFrequency(newValue);
+    }
+
+    if (parameterID == paramFilterType)
+    {
+        auto filterType = static_cast<Biquad::FilterType>(static_cast<int>(newValue));
+        m_leftBiquad.setFilterType(filterType);
+        m_rightBiquad.setFilterType(filterType);
+    }
+
+    if (parameterID == paramQ)
+    {
+        m_leftBiquad.setQ(newValue);
+        m_rightBiquad.setQ(newValue);
+    }
 }
 
 AudioProcessor* JUCE_CALLTYPE createPluginFilter()

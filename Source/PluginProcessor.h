@@ -3,9 +3,16 @@
 #include <JuceHeader.h>
 #include "Biquad.h"
 
-class SimpleFilterAudioProcessor : public AudioProcessor
+class SimpleFilterAudioProcessor : public AudioProcessor,
+    public AudioProcessorValueTreeState::Listener
 {
 public:
+    static String paramQ;
+    static String paramCutoffFrequency;
+    static String paramFilterType;
+
+    AudioProcessorValueTreeState::ParameterLayout createParameterLayout();
+
     SimpleFilterAudioProcessor();
     ~SimpleFilterAudioProcessor();
 
@@ -36,15 +43,13 @@ public:
 
     void getStateInformation (MemoryBlock& destData) override;
     void setStateInformation (const void* data, int sizeInBytes) override;
+
+    virtual void parameterChanged(const String& parameterID, float newValue) override;
 private:
     Biquad m_leftBiquad;
     Biquad m_rightBiquad;
 
-    AudioParameterFloat* m_parameterCutoffFrequency;
-    AudioParameterFloat* m_parameterQ;
-    AudioParameterChoice* m_parameterFilterType;
-
     AudioProcessorValueTreeState parameters;
 
-    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (SimpleFilterAudioProcessor)
+    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (SimpleFilterAudioProcessor)     
 };

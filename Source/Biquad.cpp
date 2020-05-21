@@ -87,6 +87,7 @@ void Biquad::calculateCoefficients()
 
 Biquad::Biquad()
 {
+    m_q = 0.703;
     m_cutoffFrequency = 440;
     m_sampleRate = 44100;
     m_filterType = FilterType::LowPass;
